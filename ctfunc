@@ -1,0 +1,94 @@
+#   ------------------------------------------------------------
+#   file:   ~/.functions
+#
+#   Handy functions for CTF
+#
+#   ------------------------------------------------------------
+
+
+function gobust() {
+    if [[ -z $2 ]]; then
+        wordlist=/usr/share/seclists/Discovery/Web-Content/common.txt
+    else
+        wordlist=$2
+    fi
+    if [[ "${1}" == "-h" || "${1}" == "--help" ]]; then
+        echo gobuster dir -u $1 -w $wordlist -s '200,204,301,302,307,403,500' -t 20 | tee gobuster.$1.out
+    else
+        gobuster dir -u $1 -w $wordlist -s '200,204,301,302,307,403,500' -t 20 | tee gobuster.$1.out
+    fi
+}
+
+# JTR with .pot removal
+john() {
+    if [[ -f ~/.john/john.pot ]]
+    then
+        rm ~/.john/john.pot
+    fi
+    /usr/sbin/john hash --wordlist=/usr/share/wordlists/rockyou.txt
+}
+
+# IPv4 socat listener for callbacks
+socat-listen() {
+    socat file:`tty`,echo=0,raw tcp4-listen:$1
+}
+
+# Quick listener for a windows shell
+winshell() {
+    msfconsole -r <(echo "use multi/handler
+    set payload windows/shell/reverse_tcp
+    set lhost tun0
+    set lport ${1=4444}
+    exploit -j")
+}
+
+# Sane defaults for onetwopunch
+onetwopunch() {
+    /opt/onetwopunch.sh -t <(echo "${1}") -p all -i tun0 -n '-sV --script=default -oN nmap'
+}
+
+# masscan defaults for both TCP and UDP
+massudp() {
+    sudo masscan -e tun0 --ports U:0-65535 -oL "scan.${1}.udp" --rate 700 "${1}"
+}
+
+masstcp() {
+    sudo masscan -e tun0 -p0-65535 --rate 700 -oL "scan.${1}.tcp" "${1}"
+}
+
+# nikto defaults that conform to my workflow
+nikto() {
+    /usr/bin/nikto -host "${1}" | tee nikto."${1}".out
+}
+
+# Dump shellcode from a compiled binary or object file
+dump-shellcode() {
+    accum=0
+    sentry="No nulls found"
+    for i in $(objdump -d "${1}" | grep "^ " | cut -f 2)
+    do
+        echo -n '\x'$i
+        accum=$(( accum + 1 ))
+        if [[ "${i}" = "00" ]]
+        then
+            sentry="You have nulls, try again"
+        fi
+    done
+    echo && echo "length of shellcode: $accum"
+    echo "${sentry}"
+}
+
+# Assemble and link .nasm/.asm files
+assemble() {
+    name="${1}"
+    base="$(basename ${name} .nasm)"
+    base="$(basename ${base} .asm)"
+    nasm -f elf64 "${name}" -o "${base}".o
+    ld "${base}".o -o "${base}"
+}
+
+# Locate syscall number
+findsyscall() {
+   egrep --color=auto --color -i "${1}" /usr/include/x86_64-linux-gnu/asm/unistd_64.h
+}
+
