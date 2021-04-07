@@ -1,0 +1,236 @@
+#   ------------------------------------------------------------
+#   file:   ~/.functions
+#
+#   1.  FILE AND FOLDER MANAGEMENT
+#   2.  SEARCHING
+#   3.  PROCESS MANAGEMENT
+#   4.  NETWORKING
+#   5.  HELPERS
+#
+#   ------------------------------------------------------------
+
+#   -------------------------------
+#   1.  FILE AND FOLDER MANAGEMENT
+#   -------------------------------
+
+#   mkzip: Create a ZIP archive of a folder
+#   mktar: Create a TAR archive of a folder
+#   mkgz: Create a TAR gzip archive of a folder
+#   mkbz: Create a TAR bz2 archive of a folder
+#   -----------------------------------------------------
+mkzip () { zip -r "$1".zip "$1" ; }
+mktar() { tar cvf  "${1%%/}.tar"     "${1%%/}/"; }
+mktgz() { tar cvzf "${1%%/}.tar.gz"  "${1%%/}/"; }
+mktbz() { tar cvjf "${1%%/}.tar.bz2" "${1%%/}/"; }
+
+# Extract Files
+extract() {  if [ -f $1 ] ; then
+    case $1 in
+        *.tar.bz2)   tar xvjf $1    ;;
+        *.tar.gz)    tar xvzf $1    ;;
+        *.tar.xz)    tar xvJf $1    ;;
+        *.bz2)       bunzip2 $1     ;;
+        *.rar)       unrar x $1     ;;
+        *.gz)        gunzip $1      ;;
+        *.tar)       tar xvf $1     ;;
+        *.tbz2)      tar xvjf $1    ;;
+        *.tgz)       tar xvzf $1    ;;
+        *.zip)       unzip $1       ;;
+        *.Z)         uncompress $1  ;;
+        *.7z)        7z x $1        ;;
+        *.xz)        unxz $1        ;;
+        *.exe)       cabextract $1  ;;
+        *)           echo "\`$1': unrecognized file compression" ;;
+    esac
+else
+    echo "\`$1' is not a valid file"
+fi
+}
+
+#   mkd: Create a new directory and enter it
+#   -----------------------------------------------------
+function mkd() {
+    mkdir -p "$@" && cd "$_";
+}
+
+#   cpf: Follow copied files to destination directory
+#   mvf: Follow moved files to destination directory
+#   -----------------------------------------------------
+cpf() { cp "$@" && goto "$_"; }
+mvf() { mv "$@" && goto "$_"; }
+
+#   ---------------------------
+#   2.  SEARCHING
+#   ---------------------------
+
+#   ffn: Find file contains in name a given string
+#   ff:  Find file under the current directory
+#   ffs: Find file whose name starts with a given string
+#   ffe: Find file whose name ends with a given string
+#   fft: Find all files types
+#   -----------------------------------------------------
+ffn() { /usr/bin/find . -iname "*$@*"; }
+ff () { /usr/bin/find . -name "$@" ; }
+ffs () { /usr/bin/find . -name "$@"'*' ; }
+ffe () { /usr/bin/find . -name '*'"$@" ; }
+fft () { find . -type f -name '*.*' | sed 's|.*\.||' | sort -u; }
+
+#   ---------------------------
+#   3.  PROCESS MANAGEMENT
+#   ---------------------------
+
+#   findPid: find out the pid of a specified process
+#   -----------------------------------------------------
+#       Note that the command name can be specified via a regex
+#       E.g. findPid '/d$/' finds pids of all processes with names ending in 'd'
+#       Without the 'sudo' it will only find processes of the current user
+#   -----------------------------------------------------
+findPid () { lsof -t -c "$@" ; }
+
+#   my_ps: List processes owned by my user:
+#   ------------------------------------------------------------
+my_ps() { ps $@ -u $USER -o pid,%cpu,%mem,start,time,bsdtime,command ; }
+
+#   ---------------------------
+#   4.  NETWORKING
+#   ---------------------------
+
+#   myip: Public facing IP Address
+#   alias myip='curl ip.appspot.com'
+#   -------------------------------------------------------------------
+function myip { local api
+    case "$1" in
+        "-4")
+            api="http://v4.ipv6-test.com/api/myip.php"
+            ;;
+        "-6")
+            api="http://v6.ipv6-test.com/api/myip.php"
+            ;;
+        *)
+            api="http://ipv6-test.com/api/myip.php"
+            ;;
+        esac
+            curl -s "$api"
+            echo # Newline.
+}
+
+#   mytun: Print the tun0 interface addreess
+#   -------------------------------------------------------------------
+mytun() {
+    echo $(ip a s tun0 | grep -w inet | awk '{print $2}' | awk -F/ '{print $1}';)
+}
+
+#   digga: Run `dig` and display the most useful info
+#   -------------------------------------------------------------------
+function digga() {
+    dig +nocmd "$1" any +multiline +noall +answer;
+}
+
+#   nscan: Nmap subnet
+#   -------------------------------------------------------------------
+nscan() {
+  nmap -sP ${1:-192.168.1.0/24}
+}
+
+#   wscan: Sow sorted list of available wireless AP
+#   -------------------------------------------------------------------
+wscan() {
+  sudo iw dev ${1:=wlp3s0} scan | echo "WiFi scanning...\n" && egrep "signal:|SSID:" | sed -e "s/\tsignal: //" -e "s/\tSSID: //" | awk '{ORS = (NR % 2 == 0)? "\n" : " "; print}' | sort && echo "Done"
+}
+
+#   ---------------------------
+#   5.  HELPERS
+#   ---------------------------
+
+#   ii:  display useful host related informaton
+#   -------------------------------------------------------------------
+ii() {
+    echo -e "\nYou are logged on ${GREEN}$HOST"
+    echo -e "\nAdditionnal information:$NC " ; uname -a
+    echo -e "\n${WHITE}Users logged on:$NC " ; w -h
+    echo -e "\n${WHITE}Current date :$NC " ; date
+    echo -e "\n${WHITE}Machine stats :$NC " ; uptime
+    # echo -e "\n${WHITE}Current network location :$NC " ; scselect
+    echo -e "\n${WHITE}Public facing IP Address :$NC " ;myip
+    #echo -e "\n${RED}DNS Configuration:$NC " ; scutil --dns
+    echo
+}
+
+#   man: Custom color man pages
+#   -----------------------------------------------------
+man() {
+    env \
+        LESS_TERMCAP_mb=$'\e[1;31m' \
+        LESS_TERMCAP_md=$'\e[1;31m' \
+        LESS_TERMCAP_me=$'\e[0m' \
+        LESS_TERMCAP_se=$'\e[0m' \
+        LESS_TERMCAP_so=$'\e[1;44;33m' \
+        LESS_TERMCAP_ue=$'\e[0m' \
+        LESS_TERMCAP_us=$'\e[1;32m' \
+            man "$@"
+}
+
+#   tm: Start tmux session
+#   Optional add argument to set the session name otherwise is set to hostname
+#   -------------------------------------------------------------------
+tm() {
+    name=${1:-${HOSTNAME}}
+    tmux -f ~/.tmux.conf -S /tmp/tmux-session-"$name" new -s "$name" \
+        || tmux -f ~/.tmux.conf -S /tmp/tmux-session-"$name" attach-session -d -t "$name"
+}
+
+#   keys: Load ssh kyes in keychain
+#   -------------------------------------------------------------------
+keys() {
+    # Example multiple keys: eval `keychain --eval --agents ssh id_rsa id_rsa_2`
+    if hash keychain 2>/dev/null; then
+       eval `keychain --eval --agents ssh id_rsa`
+    else
+       echo "Missing keychain!"
+    fi
+}
+
+#   nsg: grep through netstat or ss output, whichever is appropriate
+#   -------------------------------------------------------------------
+nsg() {
+    if [[ $(which netstat) ]]
+    then
+        netstat -pan | egrep -i "${1}"
+    else
+        ss -pan | egrep -i "${1}"
+    fi
+}
+
+#   gituser: Set project specified git user
+#   -----------------------------------------------------
+gituser() {
+    git config user.name $1 && git config user.email $2;
+}
+
+#   exifwipe: Remove EXIF data from images in current directory with progress
+#   -------------------------------------------------------------------
+exifwipe () {
+  i=0; f=$(find . -type f -iregex ".*jpg");c=$(echo $f|sed "s/ /\n/g"| wc -l);for x in $f;do i=$(($i + 1));echo "$x $i of $c"; mogrify -strip $x;done
+}
+
+#   imghtmlgalery: Generate HTML page with image gallery from folder contents
+#   -------------------------------------------------------------------
+imghtmlgalery () {
+  find . -iname '*.jpg' -exec echo '<img src="{}">' \; > gallery.html
+}
+
+#   imgslideshow: Slideshow of images with feh
+#   F - fullscreen
+#   z - random
+#   D - time display in sec.
+#   -------------------------------------------------------------------
+imgslideshow () {
+  feh -Fr -D 5 .
+}
+
+#   CTF cutom functions
+#   -------------------------------------------------------------------
+if [ -f ~/.ctfunc ]; then
+   . ~/.ctfunc
+fi
+# EOF
